@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BUKU SAYA</title>
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --bg: #F3F5F7;
+  --surface: #FFFFFF;
+  --ink: #14293D;
+  --muted: #5B6B7A;
+  --line: #D9DEE3;
+  --accent: #E8A317;
+  --accent-ink: #14293D;
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1A25; --surface: #172432; --ink: #E8EEF3; --muted: #93A3B2; --line: #263647;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1A25; --surface: #172432; --ink: #E8EEF3; --muted: #93A3B2; --line: #263647;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.bar { max-width: 1300px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+.brand { font-family: var(--serif); font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700; letter-spacing: .04em; margin: 0; flex: 1; text-align: center; }
+
+.grid {
+  max-width: 1300px; margin: 0 auto; padding: 32px 24px 56px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 32px 24px;
+}
+.book { display: flex; flex-direction: column; gap: 10px; }
+.cover {
+  aspect-ratio: 2 / 3; border-radius: 3px 8px 8px 3px; padding: 16px 12px 14px 20px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  color: #fff; position: relative; overflow: hidden;
+  box-shadow: 0 6px 14px rgba(20,41,61,.25), inset 4px 0 0 rgba(0,0,0,.22), inset 6px 0 0 rgba(255,255,255,.12);
+}
+.cover.has-img { padding: 0; background: var(--line); }
+.cover.has-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.item .mini.has-img { background-size: cover; background-position: center; }
+.cover .ttl { font-family: var(--serif); font-size: clamp(.95rem, 1.5vw, 1.35rem); font-weight: 700; line-height: 1.15; }
+.meta h3 { font-size: clamp(.92rem, 1.1vw, 1.05rem); margin: 0; font-family: var(--serif); }
+.meta .by { color: var(--muted); font-size: .88rem; margin: 0; }
+.meta .row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 8px; }
+.price { font-weight: 700; }
+.rating { color: var(--muted); font-size: .85rem; }
+
+
+.bar { position: relative; }
+.brand { margin-left: 44px; }
+.cart-btn { position: relative; width: 44px; height: 44px; border: 0; border-radius: 999px; background: var(--ink); color: var(--bg); display: grid; place-items: center; flex: none; }
+.cart-btn svg { width: 22px; height: 22px; }
+.cart-btn .count { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: .75rem; font-weight: 700; display: grid; place-items: center; }
+
+.book { cursor: pointer; }
+.book:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 8px; }
+
+.detail { max-width: 1000px; margin: 0 auto; padding: 24px 24px 64px; }
+.back { background: none; border: 0; color: var(--ink); font-weight: 600; padding: 8px 0; margin-bottom: 16px; }
+.detail-wrap { display: grid; grid-template-columns: minmax(200px, 320px) 1fr; gap: 40px; align-items: start; }
+.detail .cover { width: 100%; }
+.detail h2 { font-family: var(--serif); font-size: clamp(1.6rem, 3.5vw, 2.4rem); line-height: 1.15; margin: 0 0 6px; }
+.detail .by { color: var(--muted); margin: 0 0 12px; font-size: 1.05rem; }
+.detail .rating { font-size: 1rem; }
+.detail .price { font-size: 1.8rem; display: block; margin: 12px 0 16px; }
+.detail .desc { color: var(--muted); max-width: 56ch; margin: 0 0 24px; }
+.add { padding: 14px 28px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 1rem; }
+.add[disabled] { background: #2F7D5B; color: #fff; cursor: default; }
+
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+.overlay.open { opacity: 1; pointer-events: auto; }
+aside.cart { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100%); background: var(--surface); z-index: 30; transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+aside.cart.open { transform: none; }
+.cart-head { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--line); }
+.cart-head h2 { margin: 0; font-family: var(--serif); }
+.close { background: none; border: 0; color: var(--ink); font-size: 1.6rem; }
+.items { flex: 1; overflow-y: auto; padding: 8px 16px; }
+.item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.item .mini { width: 40px; height: 58px; border-radius: 2px 4px 4px 2px; flex: none; }
+.item .info { flex: 1; min-width: 0; }
+.item .info b { display: block; font-family: var(--serif); }
+.item .info span { color: var(--muted); font-size: .88rem; }
+.remove { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: .85rem; }
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+.cart-foot { padding: 16px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+.total { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700; }
+.checkout { padding: 12px; border: 0; border-radius: 10px; background: var(--ink); color: var(--bg); font-weight: 700; }
+.checkout[disabled] { opacity: .4; cursor: not-allowed; }
+.note { color: var(--muted); font-size: .85rem; margin: 0; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; opacity: 0; transition: .2s; z-index: 40; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 700px) { .detail-wrap { grid-template-columns: 1fr; gap: 24px; } .detail .cover { max-width: 260px; } }
+
+
+.hidden-page[hidden] { display: none !important; }
+.home { max-width: 1300px; margin: 0 auto; padding: 28px 24px 0; }
+.greet { font-family: var(--serif); font-size: clamp(1.5rem, 3.2vw, 2.3rem); line-height: 1.15; margin: 0 0 4px; }
+.greet-sub { color: var(--muted); margin: 0 0 20px; }
+.filters { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.filters input[type=search], .filters select {
+  width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font: inherit;
+}
+.filters select { width: auto; min-width: 190px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 4px; grid-column: 1 / -1; }
+.chip { flex: none; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.result-info { color: var(--muted); font-size: .9rem; margin: 14px 0 0; }
+.no-result { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 48px 0; }
+.grid { padding-top: 20px; }
+@media (max-width: 640px) { .filters { grid-template-columns: 1fr; } .filters select { width: 100%; } }
+
+@media (max-width: 1000px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="bar">
+    <button class="cart-btn" id="openCart" aria-label="Buka keranjang">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 7H6"/></svg>
+      <span class="count" id="count">0</span>
+    </button>
+    <h1 class="brand" id="brand">BUKU SAYA</h1>
+    <a href="/saldo" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);color:inherit;font-weight:600;text-decoration:none">Akun &amp; saldo</a>
+  </div>
+</header>
+
+<section class="home" id="home">
+  <h2 class="greet" id="greet"></h2>
+  <p class="greet-sub">Cari buku yang mau kamu baca hari ini.</p>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Cari judul atau penulis" aria-label="Cari buku">
+    <select id="sort" aria-label="Urutkan buku">
+      <option value="default">Urutkan: Terbaru</option>
+      <option value="cheap">Harga termurah</option>
+      <option value="pricey">Harga termahal</option>
+      <option value="rating">Rating tertinggi</option>
+    </select>
+    <div class="chips" id="chips" role="group" aria-label="Kategori"></div>
+  </div>
+  <p class="result-info" id="info" role="status" aria-live="polite"></p>
+</section>
+<main class="grid" id="grid"></main>
+
+<section class="detail" id="detail" hidden></section>
+
+<div class="overlay" id="overlay"></div>
+<aside class="cart" id="cart" aria-label="Keranjang belanja" aria-hidden="true">
+  <div class="cart-head"><h2>Keranjang</h2><button class="close" id="closeCart" aria-label="Tutup keranjang">&times;</button></div>
+  <div class="items" id="items"></div>
+  <div class="cart-foot">
+    <div class="total"><span>Total</span><span id="total">Rp0</span></div>
+    <button class="checkout" id="checkout" disabled>Lanjut ke pembayaran</button>
+    <p class="note">Tombol ini masih demo. Sambungkan ke payment gateway untuk transaksi sungguhan.</p>
+  </div>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+
+<script>
+const BOOKS = [
+  { id: 1, cat: "Teknologi", title: "Belajar Python dari Nol",     author: "Sari Wulandari",    price: 89000, rating: 4.7, color: "#2F5D8A", desc: "Panduan langkah demi langkah untuk pemula: dari instalasi, variabel, dan fungsi, sampai proyek kecil pertamamu." },
+  { id: 2, cat: "Bisnis", title: "Keuangan untuk Pemula",       author: "Rina Kusuma",       price: 75000, rating: 4.5, color: "#7A4B2A", desc: "Cara mengatur gaji, menabung, dan mulai berinvestasi tanpa istilah yang bikin pusing." },
+  { id: 3, cat: "Fiksi", title: "Senja di Kota Tua",           author: "Laras Ayuningtyas", price: 59000, rating: 4.8, color: "#5B3F7A", desc: "Novel tentang pertemuan tak terduga di sebuah kota tua, dan rahasia yang tersimpan di setiap gang." },
+  { id: 4, cat: "Pengembangan Diri", title: "Kebiasaan Kecil, Hidup Baru", author: "Maya Puspita",      price: 79000, rating: 4.6, color: "#3E7D4F", desc: "Langkah-langkah kecil yang bisa dilakukan setiap hari untuk mengubah rutinitas secara bertahap." },
+  { id: 5, cat: "Sejarah", title: "Sejarah Nusantara Singkat",   author: "Prof. Anwar Hadi",  price: 85000, rating: 4.7, color: "#6B4423", desc: "Ringkasan perjalanan Nusantara dari kerajaan-kerajaan awal sampai masa modern, ditulis dengan bahasa ringan." }
+];
+
+const isImg = v => typeof v === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(v);
+function coverHTML(b) {
+  if (isImg(b.img)) return `<div class="cover has-img"><img src="${b.img}" alt="Sampul ${b.title}"></div>`;
+  return `${coverHTML(b)}`;
+}
+function miniStyle(b) { return isImg(b.img) ? `background-image:url(${b.img})` : `background:${b.color}`; }
+const rp = n => "Rp" + n.toLocaleString("id-ID");
+const $ = id => document.getElementById(id);
+let cart = [];
+try { cart = JSON.parse(localStorage.getItem("bukusaya_cart") || "[]").filter(id => BOOKS.some(b => b.id === id)); } catch (e) { cart = []; }
+const saveCart = () => { try { localStorage.setItem("bukusaya_cart", JSON.stringify(cart)); } catch (e) {} };
+
+// ---- Halaman 1: sapaan, cari, kategori, urutkan, daftar buku ----
+let cat = "Semua", query = "", sortBy = "default";
+function greeting() {
+  const h = new Date().getHours();
+  const w = h < 11 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam";
+  return w + ", selamat datang di BUKU SAYA";
+}
+$("greet").textContent = greeting();
+
+function renderChips() {
+  const cats = ["Semua", ...new Set(BOOKS.map(b => b.cat))];
+  $("chips").innerHTML = cats.map(c => `<button class="chip" aria-pressed="${c === cat}" data-c="${c}">${c}</button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(el => el.onclick = () => { cat = el.dataset.c; renderChips(); renderGrid(); });
+}
+function renderGrid() {
+  const q = query.toLowerCase().trim();
+  let list = BOOKS.filter(b => (cat === "Semua" || b.cat === cat) && (!q || (b.title + " " + b.author).toLowerCase().includes(q)));
+  if (sortBy === "cheap") list.sort((x, y) => x.price - y.price);
+  else if (sortBy === "pricey") list.sort((x, y) => y.price - x.price);
+  else if (sortBy === "rating") list.sort((x, y) => y.rating - x.rating);
+  else list.sort((x, y) => y.id - x.id);
+  $("info").textContent = list.length + " buku ditemukan";
+  if (!list.length) { $("grid").innerHTML = `<p class="no-result">Tidak ada buku yang cocok. Coba kata kunci atau kategori lain.</p>`; return; }
+  $("grid").innerHTML = list.map(b => `
+    <article class="book" tabindex="0" role="link" data-id="${b.id}" aria-label="Lihat ${b.title}">
+      ${coverHTML(b)}
+      <div class="meta">
+        <h3>${b.title}</h3>
+        <p class="by">${b.author}</p>
+        <div class="row"><span class="price">${rp(b.price)}</span><span class="rating">&#9733; ${b.rating}</span></div>
+      </div>
+    </article>`).join("");
+  $("grid").querySelectorAll(".book").forEach(el => {
+    el.onclick = () => showDetail(+el.dataset.id);
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showDetail(+el.dataset.id); } };
+  });
+}
+$("q").oninput = e => { query = e.target.value; renderGrid(); };
+$("sort").onchange = e => { sortBy = e.target.value; renderGrid(); };
+renderChips(); renderGrid();
+
+// ---- Halaman 2: detail produk (tombol tambah ke keranjang ada di sini) ----
+function showDetail(id) {
+  openId = id;
+  const b = BOOKS.find(x => x.id === id);
+  const inCart = cart.includes(id);
+  $("detail").innerHTML = `
+    <button class="back" id="back">&larr; Kembali</button>
+    <div class="detail-wrap">
+      ${coverHTML(b)}
+      <div>
+        <h2>${b.title}</h2>
+        <p class="by">${b.author}</p>
+        <span class="rating">&#9733; ${b.rating}</span>
+        <span class="price">${rp(b.price)}</span>
+        <p class="desc">${b.desc}</p>
+        <button class="add" id="addBtn" ${inCart ? "disabled" : ""}>${inCart ? "Sudah di keranjang" : "Tambah ke keranjang"}</button>
+      </div>
+    </div>`;
+  $("back").onclick = showList;
+  $("addBtn").onclick = () => addToCart(id);
+  $("home").hidden = true; $("grid").hidden = true; $("detail").hidden = false;
+  window.scrollTo(0, 0);
+}
+function showList() { openId = null; $("detail").hidden = true; $("home").hidden = false; $("grid").hidden = false; window.scrollTo(0, 0); }
+$("brand").onclick = showList; $("brand").style.cursor = "pointer";
+
+// ---- Keranjang ----
+function renderCart() {
+  $("count").textContent = cart.length;
+  const books = cart.map(id => BOOKS.find(b => b.id === id));
+  $("items").innerHTML = books.length ? books.map(b => `
+    <div class="item">
+      <div class="mini ${isImg(b.img) ? "has-img" : ""}" style="${miniStyle(b)}"></div>
+      <div class="info"><b>${b.title}</b><span>${rp(b.price)}</span></div>
+      <button class="remove" data-id="${b.id}">Hapus</button>
+    </div>`).join("") : `<p class="empty">Keranjang masih kosong. Buka salah satu buku untuk menambahkannya.</p>`;
+  $("items").querySelectorAll(".remove").forEach(el => el.onclick = () => removeFromCart(+el.dataset.id));
+  $("total").textContent = rp(books.reduce((t, b) => t + b.price, 0));
+  $("checkout").disabled = !books.length;
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 1800); }
+function addToCart(id) {
+  if (cart.includes(id)) return;
+  cart.push(id); saveCart(); renderCart();
+  const btn = $("addBtn"); if (btn) { btn.disabled = true; btn.textContent = "Sudah di keranjang"; }
+  toast("Ditambahkan ke keranjang");
+}
+let openId = null; // id buku yang sedang dibuka di halaman detail
+function removeFromCart(id) {
+  cart = cart.filter(x => x !== id); saveCart(); renderCart();
+  const btn = $("addBtn");
+  if (btn && openId === id) { btn.disabled = false; btn.textContent = "Tambah ke keranjang"; }
+}
+function setCart(open) {
+  $("cart").classList.toggle("open", open); $("overlay").classList.toggle("open", open);
+  $("cart").setAttribute("aria-hidden", String(!open));
+}
+$("openCart").onclick = () => setCart(true);
+$("closeCart").onclick = () => setCart(false);
+$("overlay").onclick = () => setCart(false);
+document.addEventListener("keydown", e => { if (e.key === "Escape") setCart(false); });
+$("checkout").onclick = () => toast("Demo: sambungkan ke payment gateway");
+renderCart();
+</script>
+</body>
+</html>

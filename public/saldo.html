@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Saldo - BUKU SAYA</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="top"><div class="bar"><h1><a href="/">BUKU SAYA</a></h1><span class="muted" id="who"></span><button class="btn" id="keluar" type="button">Keluar</button></div></header>
+<main>
+  <div class="card"><span class="muted">Saldo kamu</span><p class="saldo" id="saldo">Rp0</p></div>
+
+  <div class="card">
+    <h2>Isi saldo</h2>
+    <div class="chips" id="cepat" role="group" aria-label="Nominal cepat"></div>
+    <div class="field"><label for="nom">Nominal (Rp)</label><input id="nom" type="number" inputmode="numeric" min="10000" step="1000" placeholder="Contoh: 50000"></div>
+    <p class="err" id="err" role="alert"></p>
+    <button class="btn primary" id="buat" type="button">Buat permintaan top up</button>
+    <div class="box" id="instruksi" hidden></div>
+  </div>
+
+  <div class="card"><h2>Top up kamu</h2><div class="list" id="tops"><p class="muted">Memuat…</p></div></div>
+  <div class="card"><h2>Riwayat saldo</h2><div class="list" id="mutasi"><p class="muted">Memuat…</p></div></div>
+</main>
+<script type="module">
+import { $, siap, api, rp, esc, tgl, toast, onAuthStateChanged, signOut, doc, onSnapshot, collection, query, where, orderBy, limit } from "/app.js";
+try {
+  const { auth, db, cfg } = await siap();
+  $("keluar").onclick = () => signOut(auth);
+  [20000, 50000, 100000, 200000].forEach((n) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = rp(n); b.onclick = () => { $("nom").value = n; }; $("cepat").appendChild(b); });
+
+  onAuthStateChanged(auth, (u) => {
+    if (!u) { location.replace("/login?kembali=/saldo"); return; }
+    $("who").textContent = u.displayName || u.email;
+    onSnapshot(doc(db, "users", u.uid), (s) => { $("saldo").textContent = rp(s.exists() ? s.data().saldo : 0); });
+    onSnapshot(query(collection(db, "topups"), where("uid", "==", u.uid), orderBy("dibuat", "desc"), limit(20)), (s) => {
+      $("tops").innerHTML = s.empty ? '<p class="muted">Belum ada top up.</p>' : s.docs.map((d) => { const x = d.data(); return `<div class="row"><div><b>${rp(x.nominal)}</b><div class="muted">${tgl(x.dibuat)} &middot; transfer ${rp(x.totalTransfer)}</div></div><span class="badge ${esc(x.status)}">${esc(x.status)}</span></div>`; }).join("");
+    }, () => { $("tops").innerHTML = '<p class="muted">Tidak bisa memuat. Pastikan indeks Firestore sudah dibuat (lihat PANDUAN.md).</p>'; });
+    onSnapshot(query(collection(db, "ledger"), where("uid", "==", u.uid), orderBy("waktu", "desc"), limit(30)), (s) => {
+      $("mutasi").innerHTML = s.empty ? '<p class="muted">Belum ada mutasi.</p>' : s.docs.map((d) => { const x = d.data(); const plus = x.jumlah >= 0;
+        return `<div class="row"><div><b>${esc(x.jenis)}</b><div class="muted">${tgl(x.waktu)}</div></div><div style="text-align:right"><span class="${plus ? "plus" : "minus"}">${plus ? "+" : ""}${rp(x.jumlah)}</span><div class="muted">saldo ${rp(x.saldoSetelah)}</div></div></div>`; }).join("");
+    }, () => { $("mutasi").innerHTML = '<p class="muted">Tidak bisa memuat. Pastikan indeks Firestore sudah dibuat (lihat PANDUAN.md).</p>'; });
+  });
+
+  $("buat").onclick = async () => {
+    $("err").textContent = ""; const n = Number($("nom").value);
+    if (!Number.isInteger(n) || n <= 0) { $("err").textContent = "Isi nominal berupa angka bulat."; return; }
+    $("buat").disabled = true;
+    try {
+      const r = await api("/api/topup", { nominal: n });
+      const p = cfg.pembayaran || {};
+      $("instruksi").hidden = false;
+      $("instruksi").innerHTML = `<p style="margin:0 0 6px">Transfer <b>tepat</b> sejumlah:</p><div class="big">${rp(r.totalTransfer)}</div>
+        <p class="muted" style="margin:6px 0 10px">Tiga angka terakhir (${r.kodeUnik}) adalah kode unik agar admin bisa mencocokkan transfermu.</p>
+        <p style="margin:0">${esc(p.metode)}: <b>${esc(p.nomor || "(nomor belum diatur admin)")}</b><br>a.n. ${esc(p.nama || "-")}</p>
+        <p class="muted" style="margin:10px 0 0">Saldo bertambah setelah admin mengonfirmasi transfermu.</p>`;
+      $("nom").value = ""; toast("Permintaan top up dibuat");
+    } catch (er) { $("err").textContent = er.message; }
+    $("buat").disabled = false;
+  };
+} catch (er) { $("err").textContent = er.message; }
+</script></body></html>

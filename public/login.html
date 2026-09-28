@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Masuk - BUKU SAYA</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="top"><div class="bar"><h1><a href="/">BUKU SAYA</a></h1></div></header>
+<main style="max-width:440px">
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button class="chip" id="tMasuk" aria-pressed="true" type="button">Masuk</button>
+      <button class="chip" id="tDaftar" aria-pressed="false" type="button">Daftar</button>
+    </div>
+    <form id="form" novalidate>
+      <div class="field" id="fNama" hidden><label for="nama">Nama</label><input id="nama" autocomplete="name" maxlength="40"></div>
+      <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="pass">Kata sandi</label><input id="pass" type="password" autocomplete="current-password" minlength="6" required></div>
+      <p class="err" id="err" role="alert"></p>
+      <button class="btn primary" id="kirim" type="submit" style="width:100%">Masuk</button>
+      <p class="muted" style="margin:14px 0 0"><button type="button" id="lupa" class="btn small">Lupa kata sandi?</button></p>
+    </form>
+  </div>
+</main>
+<script type="module">
+import { $, siap, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile, pesanAuth, toast } from "/app.js";
+let daftar = false;
+const mode = (d) => { daftar = d; $("tMasuk").setAttribute("aria-pressed", String(!d)); $("tDaftar").setAttribute("aria-pressed", String(d));
+  $("fNama").hidden = !d; $("kirim").textContent = d ? "Buat akun" : "Masuk"; $("pass").autocomplete = d ? "new-password" : "current-password"; $("err").textContent = ""; };
+$("tMasuk").onclick = () => mode(false); $("tDaftar").onclick = () => mode(true);
+const tujuan = new URLSearchParams(location.search).get("kembali");
+const aman = (u) => (u && /^\/[A-Za-z0-9\-_/]*$/.test(u) ? u : "/saldo");
+try {
+  const { auth } = await siap();
+  onAuthStateChanged(auth, (u) => { if (u) location.replace(aman(tujuan)); });
+  $("form").onsubmit = async (e) => {
+    e.preventDefault(); $("err").textContent = ""; $("kirim").disabled = true;
+    const email = $("email").value.trim(), pass = $("pass").value;
+    try {
+      if (daftar) { const c = await createUserWithEmailAndPassword(auth, email, pass); const n = $("nama").value.trim(); if (n) await updateProfile(c.user, { displayName: n }); }
+      else await signInWithEmailAndPassword(auth, email, pass);
+    } catch (er) { $("err").textContent = pesanAuth(er); $("kirim").disabled = false; }
+  };
+  $("lupa").onclick = async () => {
+    const email = $("email").value.trim(); if (!email) { $("err").textContent = "Isi email dulu, lalu tekan Lupa kata sandi."; return; }
+    try { await sendPasswordResetEmail(auth, email); toast("Tautan reset dikirim jika email terdaftar."); } catch (er) { $("err").textContent = pesanAuth(er); }
+  };
+} catch (er) { $("err").textContent = er.message; $("kirim").disabled = true; }
+</script></body></html>

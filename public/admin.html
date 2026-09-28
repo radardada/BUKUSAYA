@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin - BUKU SAYA</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="top"><div class="bar"><h1><a href="/">Admin BUKU SAYA</a></h1><span class="muted" id="who"></span><button class="btn" id="keluar" type="button">Keluar</button></div></header>
+<main>
+  <div class="card" id="blok" hidden><h2>Akses ditolak</h2><p class="muted">Akun ini bukan admin. Tambahkan dokumen <code>admins/UID_KAMU</code> lewat Firebase Console (lihat PANDUAN.md).</p></div>
+  <div id="isi" hidden>
+    <div class="card"><h2>Top up menunggu konfirmasi</h2><p class="muted">Cocokkan jumlah transfer (termasuk kode unik) dengan mutasi rekening/e-wallet kamu sebelum menyetujui.</p><div class="list" id="tunggu"><p class="muted">Memuat…</p></div></div>
+    <div class="card"><h2>Riwayat top up</h2><div class="list" id="riwayat"><p class="muted">Memuat…</p></div></div>
+  </div>
+  <p class="err" id="err" role="alert"></p>
+</main>
+<script type="module">
+import { $, siap, api, rp, esc, tgl, toast, onAuthStateChanged, signOut, doc, onSnapshot, collection, query, where, orderBy, limit } from "/app.js";
+try {
+  const { auth, db } = await siap();
+  $("keluar").onclick = () => signOut(auth);
+  onAuthStateChanged(auth, (u) => {
+    if (!u) { location.replace("/login?kembali=/admin"); return; }
+    $("who").textContent = u.displayName || u.email;
+    onSnapshot(doc(db, "admins", u.uid), (s) => {
+      if (!s.exists()) { $("blok").hidden = false; $("isi").hidden = true; return; }
+      $("blok").hidden = true; $("isi").hidden = false; mulai();
+    }, () => { $("blok").hidden = false; $("isi").hidden = true; });
+  });
+  let jalan = false;
+  function mulai() {
+    if (jalan) return; jalan = true;
+    onSnapshot(query(collection(db, "topups"), where("status", "==", "menunggu"), orderBy("dibuat", "asc")), (s) => {
+      $("tunggu").innerHTML = s.empty ? '<p class="muted">Tidak ada yang menunggu.</p>' : s.docs.map((d) => { const x = d.data();
+        return `<div class="row"><div><b>${rp(x.totalTransfer)}</b><div class="muted">${esc(x.email)} &middot; nominal ${rp(x.nominal)} &middot; ${tgl(x.dibuat)}</div></div>
+          <div><button class="btn small primary" data-id="${esc(d.id)}" data-a="setuju">Setujui</button> <button class="btn small danger" data-id="${esc(d.id)}" data-a="tolak">Tolak</button></div></div>`; }).join("");
+      $("tunggu").querySelectorAll("button[data-id]").forEach((b) => b.onclick = async () => {
+        const aksi = b.dataset.a; if (aksi === "setuju" && !confirm("Setujui top up ini? Saldo pembeli akan bertambah.")) return;
+        b.disabled = true; try { const r = await api("/api/topup-proses", { id: b.dataset.id, aksi }); toast(r.status === "disetujui" ? "Top up disetujui" : "Top up ditolak"); } catch (er) { toast(er.message); b.disabled = false; } });
+    }, (er) => { $("tunggu").innerHTML = '<p class="muted">Tidak bisa memuat. Buat indeks Firestore dulu (lihat PANDUAN.md).</p>'; });
+    onSnapshot(query(collection(db, "topups"), orderBy("dibuat", "desc"), limit(30)), (s) => {
+      $("riwayat").innerHTML = s.empty ? '<p class="muted">Belum ada data.</p>' : s.docs.map((d) => { const x = d.data();
+        return `<div class="row"><div><b>${rp(x.nominal)}</b><div class="muted">${esc(x.email)} &middot; ${tgl(x.dibuat)}</div></div><span class="badge ${esc(x.status)}">${esc(x.status)}</span></div>`; }).join("");
+    }, () => {});
+  }
+} catch (er) { $("err").textContent = er.message; }
+</script></body></html>
