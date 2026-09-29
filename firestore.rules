@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function login()  { return request.auth != null; }
+    function admin()  { return login() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function pemilik(uid) { return login() && request.auth.uid == uid; }
+
+    // Katalog buku: semua orang boleh membaca (termasuk yang belum login). Ditulis hanya oleh server (api/admin-buku.js).
+    match /books/{id} { allow read: if true; allow write: if false; }
+
+    // Event diskon & voucher: dibaca publik supaya harga coret bisa dihitung di layar, ditulis hanya server.
+    match /events/{id}   { allow read: if true; allow write: if false; }
+    match /vouchers/{id} { allow read: if true; allow write: if false; }
+
+    // Profil & saldo: pemilik/adm boleh membaca saja. Tidak pernah ditulis dari browser.
+    match /users/{uid} { allow read: if pemilik(uid) || admin(); allow write: if false; }
+
+    // Top up & ledger: sama seperti Tahap 1.
+    match /topups/{id} { allow read: if admin() || (login() && resource.data.uid == request.auth.uid); allow write: if false; }
+    match /ledger/{id}  { allow read: if admin() || (login() && resource.data.uid == request.auth.uid); allow write: if false; }
+
+    // Kepemilikan buku (siapa beli apa): pemilik & admin boleh baca. "My Book" dibaca dari sini.
+    match /kepemilikan/{id} { allow read: if admin() || (login() && resource.data.uid == request.auth.uid); allow write: if false; }
+
+    // Ulasan: semua orang boleh membaca (tampil di halaman detail buku). Ditulis hanya lewat /api/ulasan.
+    match /ulasan/{id} { allow read: if true; allow write: if false; }
+
+    // Wishlist: privat milik masing-masing.
+    match /wishlist/{id} { allow read: if login() && resource.data.uid == request.auth.uid; allow write: if false; }
+
+    // Pemakaian voucher saldo (anti dobel-klaim): privat.
+    match /voucher-pakai/{id} { allow read: if login() && resource.data.uid == request.auth.uid; allow write: if false; }
+
+    // Daftar admin: hanya bisa dibuat manual lewat Firebase Console.
+    match /admins/{uid} { allow read: if pemilik(uid); allow write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}
