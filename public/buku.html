@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Buku - BUKU SAYA</title><link rel="stylesheet" href="/style.css">
+<style>
+.detail { max-width:1000px; margin:0 auto; padding:20px 20px 40px; }
+.back { background:none; border:0; color:var(--ink); font-weight:600; padding:8px 0; margin-bottom:12px; }
+.wrap { display:grid; grid-template-columns:minmax(200px,300px) 1fr; gap:32px; align-items:start; }
+.cover { width:100%; aspect-ratio:2/3; border-radius:3px 8px 8px 3px; padding:18px 14px; display:flex; flex-direction:column; justify-content:space-between; color:#fff; box-shadow:0 8px 18px rgba(20,41,61,.28); }
+.cover.has-img { padding:0; background:var(--line); } .cover.has-img img { width:100%; height:100%; object-fit:cover; border-radius:3px 8px 8px 3px; display:block; }
+.cover .ttl { font-family:var(--serif); font-size:1.3rem; font-weight:700; }
+h2 { font-family:var(--serif); font-size:clamp(1.5rem,3.2vw,2.2rem); margin:0 0 4px; }
+.by { color:var(--muted); margin:0 0 10px; }
+.price-row { margin:10px 0 4px; font-size:1.6rem; font-family:var(--serif); }
+.desc { color:var(--muted); max-width:60ch; margin:12px 0 18px; }
+.wish { background:none; border:1px solid var(--line); border-radius:999px; padding:8px 16px; color:var(--ink); font-weight:600; }
+.wish.on { border-color:var(--danger); color:var(--danger); }
+.beli-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+.beli { padding:13px 26px; border:0; border-radius:10px; background:var(--accent); color:var(--accent-ink); font-weight:700; }
+.beli[disabled] { background:#2F7D5B; color:#fff; cursor:default; }
+.voucher-box { display:flex; gap:8px; margin-top:14px; max-width:340px; }
+.voucher-box input { flex:1; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); text-transform:uppercase; }
+.section { margin-top:32px; }
+.section h3 { font-family:var(--serif); margin:0 0 10px; }
+.ulasan-item { border-bottom:1px solid var(--line); padding:12px 0; }
+.ulasan-item b { font-family:var(--serif); }
+.ulasan-item .muted { font-size:.82rem; }
+.form-ulasan textarea { width:100%; min-height:80px; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font:inherit; resize:vertical; }
+.pilih-bintang { display:flex; gap:4px; margin:8px 0; }
+.pilih-bintang button { background:none; border:0; font-size:1.5rem; color:var(--line); padding:0 2px; }
+.pilih-bintang button.on { color:#D99A1B; }
+</style></head>
+<body>
+<header class="top"><div class="bar"><h1 style="font-family:var(--serif);font-size:1.3rem;margin:0"><a href="/" style="color:inherit;text-decoration:none">BUKU SAYA</a></h1></div></header>
+<main class="detail">
+  <button class="back" onclick="history.length>1?history.back():location.href='/'">&larr; Kembali</button>
+  <p id="status" class="muted">Memuat…</p>
+  <div id="isi" hidden>
+    <div class="wrap">
+      <div id="coverBox"></div>
+      <div>
+        <h2 id="title"></h2>
+        <p class="by" id="author"></p>
+        <span class="stars" id="rating"></span>
+        <div class="price-row" id="priceRow"></div>
+        <p class="desc" id="desc"></p>
+        <div class="beli-row">
+          <button class="beli" id="btnBeli" type="button">Beli sekarang</button>
+          <button class="wish" id="btnWish" type="button">&hearts; Simpan</button>
+        </div>
+        <div class="voucher-box">
+          <input id="voucher" placeholder="Kode voucher (opsional)" maxlength="24">
+        </div>
+        <p class="err" id="err" role="alert" style="margin-top:8px"></p>
+      </div>
+    </div>
+
+    <section class="section">
+      <h3>Ulasan pembaca</h3>
+      <div id="formUlasanWrap"></div>
+      <div id="ulasanList"><p class="muted">Belum ada ulasan.</p></div>
+    </section>
+  </div>
+</main>
+<script type="module">
+import { $, esc, rp, tgl, toast, siap, api, pasangNav, onAuthStateChanged, doc, onSnapshot, collection, query, where, orderBy, limit } from "/app.js";
+pasangNav("menu");
+
+const id = new URLSearchParams(location.search).get("id");
+if (!id) { $("status").textContent = "Buku tidak ditemukan."; throw new Error("no id"); }
+
+let bukuData = null, eventData = null, uid = null, punya = false, wishOn = false;
+
+function hargaAkhir() {
+  if (!bukuData) return 0;
+  if (!eventData || eventData.status !== "aktif") return bukuData.price;
+  const now = Date.now();
+  if (eventData.mulai && now < eventData.mulai) return bukuData.price;
+  if (eventData.selesai && now > eventData.selesai) return bukuData.price;
+  if (Array.isArray(eventData.kategori) && eventData.kategori.length && !eventData.kategori.includes(bukuData.cat)) return bukuData.price;
+  const potongan = eventData.tipe === "persen" ? Math.round(bukuData.price * (eventData.nilai / 100)) : eventData.nilai;
+  return Math.max(0, bukuData.price - Math.min(potongan, bukuData.price));
+}
+
+function renderHarga() {
+  const akhir = hargaAkhir(), diskon = akhir < (bukuData?.price || 0);
+  $("priceRow").innerHTML = diskon ? `<span class="strike">${rp(bukuData.price)}</span> ${rp(akhir)} <span class="pill diskon">Diskon</span>` : rp(akhir);
+}
+
+function renderTombolBeli() {
+  const b = $("btnBeli");
+  if (punya) { b.textContent = "Sudah dimiliki — buka di My Book"; b.disabled = false; b.onclick = () => location.href = "/mybook"; }
+  else { b.textContent = "Beli sekarang"; b.disabled = false; b.onclick = beliSekarang; }
+}
+
+async function beliSekarang() {
+  $("err").textContent = "";
+  if (!uid) { location.href = "/login?kembali=" + encodeURIComponent(location.pathname + location.search); return; }
+  $("btnBeli").disabled = true;
+  try {
+    const r = await api("/api/beli", { bukuId: id, kodeVoucher: $("voucher").value.trim() });
+    toast(r.hargaDibayar === 0 ? "Buku gratis berhasil ditambahkan!" : "Pembelian berhasil!");
+    punya = true; renderTombolBeli();
+  } catch (e) { $("err").textContent = e.message; $("btnBeli").disabled = false; }
+}
+
+async function toggleWish() {
+  if (!uid) { location.href = "/login?kembali=" + encodeURIComponent(location.pathname + location.search); return; }
+  const btn = $("btnWish"); btn.disabled = true;
+  try { await api("/api/wishlist", { bukuId: id, aksi: wishOn ? "hapus" : "tambah" }); wishOn = !wishOn; renderWish(); }
+  catch (e) { toast(e.message); }
+  btn.disabled = false;
+}
+function renderWish() { const b = $("btnWish"); b.classList.toggle("on", wishOn); b.textContent = (wishOn ? "♥ Tersimpan" : "♡ Simpan"); }
+
+function renderFormUlasan() {
+  if (!punya) { $("formUlasanWrap").innerHTML = uid ? `<p class="muted">Beli buku ini dulu untuk memberi ulasan.</p>` : ""; return; }
+  $("formUlasanWrap").innerHTML = `
+    <div class="form-ulasan">
+      <div class="pilih-bintang" id="bintang" role="radiogroup" aria-label="Beri bintang">${[1,2,3,4,5].map(n => `<button type="button" data-n="${n}" aria-label="${n} bintang">&#9733;</button>`).join("")}</div>
+      <textarea id="teksUlasan" placeholder="Ceritakan pendapatmu tentang buku ini (opsional)" maxlength="500"></textarea>
+      <p class="err" id="errUlasan" role="alert"></p>
+      <button class="btn primary" id="kirimUlasan" type="button" style="margin-top:8px">Kirim ulasan</button>
+    </div>`;
+  let pilih = 0;
+  const tombol = $("bintang").querySelectorAll("button");
+  const gambar = () => tombol.forEach(b => b.classList.toggle("on", +b.dataset.n <= pilih));
+  tombol.forEach(b => b.onclick = () => { pilih = +b.dataset.n; gambar(); });
+  $("kirimUlasan").onclick = async () => {
+    if (!pilih) { $("errUlasan").textContent = "Pilih bintang dulu."; return; }
+    $("kirimUlasan").disabled = true;
+    try { await api("/api/ulasan", { bukuId: id, bintang: pilih, teks: $("teksUlasan").value }); toast("Ulasan terkirim, terima kasih!"); $("teksUlasan").value = ""; pilih = 0; gambar(); }
+    catch (e) { $("errUlasan").textContent = e.message; }
+    $("kirimUlasan").disabled = false;
+  };
+}
+
+try {
+  const { db, auth } = await siap();
+  onSnapshot(doc(db, "books", id), s => {
+    if (!s.exists()) { $("status").textContent = "Buku tidak ditemukan."; return; }
+    bukuData = s.data(); $("status").hidden = true; $("isi").hidden = false;
+    $("title").textContent = bukuData.title; $("author").textContent = bukuData.author;
+    $("rating").innerHTML = "&#9733; " + (bukuData.rating || 0).toFixed(1) + ` <span class="muted">(${bukuData.jumlahUlasan || 0} ulasan &middot; ${bukuData.terjual || 0} terjual)</span>`;
+    $("desc").textContent = bukuData.desc || "";
+    $("coverBox").innerHTML = bukuData.imgUrl ? `<div class="cover has-img"><img src="${bukuData.imgUrl}" alt="Sampul ${esc(bukuData.title)}"></div>` : `<div class="cover" style="background:linear-gradient(160deg, ${bukuData.color}, ${bukuData.color}cc)"><div class="ttl">${esc(bukuData.title)}</div></div>`;
+    renderHarga();
+  }, () => { $("status").textContent = "Gagal memuat buku."; });
+
+  onSnapshot(collection(db, "events"), s => { s.forEach(d => { if (bukuData && bukuData.eventId === d.id) { eventData = d.data(); renderHarga(); } }); });
+
+  onSnapshot(query(collection(db, "ulasan"), where("bukuId", "==", id), orderBy("waktu", "desc"), limit(30)), s => {
+    $("ulasanList").innerHTML = s.empty ? '<p class="muted">Belum ada ulasan.</p>' : s.docs.map(d => { const x = d.data();
+      return `<div class="ulasan-item"><b>${esc(x.nama)}</b> <span class="stars">${"&#9733;".repeat(x.bintang)}</span><div class="muted">${tgl(x.waktu)}</div>${x.teks ? `<p style="margin:6px 0 0">${esc(x.teks)}</p>` : ""}</div>`; }).join("");
+  }, () => {});
+
+  onAuthStateChanged(auth, async (u) => {
+    uid = u ? u.uid : null;
+    if (u) {
+      onSnapshot(doc(db, "kepemilikan", u.uid + "_" + id), s => { punya = s.exists(); renderTombolBeli(); renderFormUlasan(); });
+      onSnapshot(doc(db, "wishlist", u.uid + "_" + id), s => { wishOn = s.exists(); renderWish(); });
+    } else { punya = false; wishOn = false; renderTombolBeli(); renderWish(); renderFormUlasan(); }
+  });
+  $("btnWish").onclick = toggleWish;
+} catch (er) { $("status").textContent = er.message; }
+</script>
+</body></html>
