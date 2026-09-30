@@ -11,31 +11,11 @@ function headers(extra = {}) {
   return { Authorization: `Bearer ${k}`, apikey: k, ...extra };
 }
 
-// Bikin bucket otomatis kalau belum ada (sampul = publik, file-buku = privat).
-async function buatBucket(bucket) {
-  const r = await fetch(`${URL_BASE()}/storage/v1/bucket`, {
-    method: "POST", headers: headers({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ id: bucket, name: bucket, public: bucket === BUCKET_GAMBAR }),
-  });
-  const j = await r.json().catch(() => ({}));
-  // 409 / "already exists" = sudah ada, aman
-  if (!r.ok && !/exist|duplicate/i.test(JSON.stringify(j))) throw new Error(j.message || "Gagal membuat bucket di Supabase.");
-}
-
-async function kirim(bucket, path, buffer, contentType) {
+async function upload(bucket, path, buffer, contentType) {
   const r = await fetch(`${URL_BASE()}/storage/v1/object/${bucket}/${path}`, {
     method: "POST", headers: headers({ "Content-Type": contentType, "x-upsert": "true" }), body: buffer,
   });
   const j = await r.json().catch(() => ({}));
-  return { r, j };
-}
-
-async function upload(bucket, path, buffer, contentType) {
-  let { r, j } = await kirim(bucket, path, buffer, contentType);
-  if (!r.ok && /bucket not found/i.test(JSON.stringify(j))) {
-    await buatBucket(bucket);
-    ({ r, j } = await kirim(bucket, path, buffer, contentType));
-  }
   if (!r.ok) throw new Error(j.message || "Gagal upload ke Supabase.");
   return path;
 }
