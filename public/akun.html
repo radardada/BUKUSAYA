@@ -110,7 +110,7 @@ try {
       $("instruksi").innerHTML = `<p style="margin:0 0 6px">Transfer <b>tepat</b> sejumlah:</p><div class="big">${rp(r.totalTransfer)}</div>
         <p class="muted" style="margin:6px 0 10px">Tiga angka terakhir (${r.kodeUnik}) adalah kode unik agar admin bisa mencocokkan transfermu.</p>
         <p style="margin:0">${esc(p.metode)}: <b>${esc(p.nomor || "(nomor belum diatur admin)")}</b><br>a.n. ${esc(p.nama || "-")}</p>
-        <p class="muted" style="margin:10px 0 0">Saldo bertambah setelah admin mengonfirmasi transfermu.</p>`;
+        <p class="muted" style="margin:10px 0 0">Saldo bertambah setelah admin mengonfirmasi transfermu. anda juga bisa menghubungi pihak kami kalau terasa cukup lama 85124869641/85135993982</p>`;
       $("nom").value = ""; toast("Permintaan top up dibuat");
     } catch (e) { $("err").textContent = e.message; }
     $("buat").disabled = false;
