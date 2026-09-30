@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Book - BUKU SAYA</title><link rel="stylesheet" href="/style.css">
+<style>
+.list-book { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:18px; }
+.mb { cursor:pointer; display:flex; flex-direction:column; gap:6px; }
+.mb .cover { aspect-ratio:2/3; border-radius:3px 6px 6px 3px; padding:12px 10px; color:#fff; display:flex; align-items:flex-end; box-shadow:0 5px 12px rgba(20,41,61,.25); }
+.mb .cover.has-img { padding:0; background:var(--line); } .mb .cover.has-img img { width:100%; height:100%; object-fit:cover; border-radius:3px 6px 6px 3px; display:block; }
+.mb .cover span { font-family:var(--serif); font-weight:700; font-size:.85rem; }
+.mb b { font-family:var(--serif); font-size:.85rem; }
+.progress { height:5px; border-radius:999px; background:var(--line); overflow:hidden; margin-top:2px; }
+.progress i { display:block; height:100%; background:var(--ok); }
+/* Halaman detail buku terbeli */
+.mbdetail { display:none; }
+.mbdetail.on { display:block; }
+.mbwrap { display:grid; grid-template-columns:minmax(180px,260px) 1fr; gap:28px; align-items:start; }
+.mbcover { width:100%; aspect-ratio:2/3; border-radius:3px 8px 8px 3px; }
+.mbcover.has-img { background:var(--line); } .mbcover.has-img img { width:100%; height:100%; object-fit:cover; border-radius:3px 8px 8px 3px; display:block; }
+.aksi-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.aksi-row .btn { padding:12px 22px; }
+/* Reader sederhana */
+.reader { position:fixed; inset:0; background:var(--bg); z-index:40; display:flex; flex-direction:column; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+.reader-top { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line); }
+.reader-top b { font-family:var(--serif); flex:1; }
+.reader-body { flex:1; overflow-y:auto; padding:20px; max-width:700px; margin:0 auto; width:100%; line-height:1.8; font-size:1.05rem; }
+
+/* Reader PDF ala buku */
+.reader[hidden] { display:none; }
+.reader-top .muted { font-size:.85rem; }
+.flip { flex:1; position:relative; perspective:1800px; overflow:hidden; background:#1b2530; touch-action:pan-y; user-select:none; }
+.flip-msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; color:#cfd8e0; line-height:1.7; overflow-y:auto; }
+.pg { position:absolute; inset:0; margin:auto; background:#fff; transform-origin:left center; backface-visibility:hidden; box-shadow:0 10px 30px #0008; transition:transform .75s cubic-bezier(.45,.05,.25,1), filter .75s; }
+.pg canvas { display:block; }
+.pg.turun { transform:rotateY(-110deg); filter:brightness(.55); }
+.pg.awal { transform:rotateY(-110deg); filter:brightness(.55); }
+.flip-nav { display:flex; align-items:center; gap:10px; padding:10px 16px; border-top:1px solid var(--line); }
+.flip-nav input { flex:1; accent-color:var(--accent); }
+</style></head>
+<body>
+<header class="top"><div class="bar"><h1 style="font-family:var(--serif);font-size:1.3rem;margin:0">My Book</h1></div></header>
+<main id="main">
+  <p class="muted" id="status" style="padding:0 20px">Memuat…</p>
+  <div id="listWrap" style="padding:16px 20px" hidden>
+    <div class="list-book" id="list"></div>
+  </div>
+
+  <div class="mbdetail" id="mbDetail" style="padding:16px 20px">
+    <button class="back" id="back" type="button" style="background:none;border:0;color:var(--ink);font-weight:600;padding:8px 0">&larr; Kembali</button>
+    <div class="mbwrap">
+      <div id="mbCoverBox"></div>
+      <div>
+        <h2 id="mbTitle" style="font-family:var(--serif);margin:0 0 4px"></h2>
+        <p class="muted" id="mbAuthor"></p>
+        <p class="muted" id="mbProgres"></p>
+        <div class="aksi-row">
+          <button class="btn primary" id="btnBacaSini" type="button">Baca di sini</button>
+          <button class="btn" id="btnUnduh" type="button">Unduh</button>
+        </div>
+        <p class="err" id="mbErr" role="alert"></p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="reader" id="reader" hidden>
+  <div class="reader-top">
+    <button class="btn small" id="tutupReader" type="button">Tutup</button>
+    <b id="readerTitle"></b>
+    <span class="muted" id="rdHal"></span>
+  </div>
+  <div class="flip" id="flip"><div class="flip-msg" id="flipMsg">Memuat buku…</div></div>
+  <div class="flip-nav"><button class="btn small" id="rdPrev" type="button" aria-label="Halaman sebelumnya">&lsaquo;</button><input type="range" id="rdSlider" min="1" max="1" value="1" aria-label="Halaman"><button class="btn small" id="rdNext" type="button" aria-label="Halaman berikutnya">&rsaquo;</button></div>
+</div>
+
+<script type="module">
+import { $, esc, tgl, toast, siap, api, pasangNav, onAuthStateChanged, doc, onSnapshot, collection, query, where, orderBy } from "/app.js";
+pasangNav("mybook");
+
+function coverHTML(b, cls) {
+  if (b.imgUrl) return `<div class="cover ${cls} has-img"><img src="${b.imgUrl}" alt="Sampul ${esc(b.title)}"></div>`;
+  return `<div class="cover ${cls}" style="background:linear-gradient(160deg, ${b.color}, ${b.color}cc)"><span>${esc(b.title)}</span></div>`;
+}
+
+let bukuMap = {}, daftarPunya = [], dipilih = null;
+
+function tampilkanList() {
+  $("mbDetail").classList.remove("on");
+  $("listWrap").hidden = false;
+  if (!daftarPunya.length) { $("list").innerHTML = ""; $("status").hidden = false; $("status").textContent = "Kamu belum punya buku. Yuk mulai beli di menu utama."; return; }
+  $("status").hidden = true;
+  $("list").innerHTML = daftarPunya.map(k => {
+    const b = bukuMap[k.bukuId]; if (!b) return "";
+    return `<article class="mb" data-id="${esc(k.bukuId)}">${coverHTML(b, "")}<b>${esc(b.title)}</b>
+      <div class="progress"><i style="width:${Math.round((k.progres || 0) * 100)}%"></i></div></article>`;
+  }).join("");
+  $("list").querySelectorAll(".mb").forEach(el => el.onclick = () => bukaDetail(el.dataset.id));
+}
+
+function bukaDetail(bukuId) {
+  const b = bukuMap[bukuId], k = daftarPunya.find(x => x.bukuId === bukuId);
+  if (!b || !k) return;
+  dipilih = { b, k };
+  $("listWrap").hidden = true; $("mbDetail").classList.add("on");
+  $("mbCoverBox").innerHTML = coverHTML(b, "mbcover");
+  $("mbTitle").textContent = b.title; $("mbAuthor").textContent = b.author;
+  $("mbProgres").textContent = "Dibeli " + tgl(k.dibeli) + (k.progres ? ` &middot; progres baca ${Math.round(k.progres * 100)}%`.replace("&middot;", "\u00B7") : "");
+  $("mbErr").textContent = "";
+  $("btnUnduh").disabled = !b.filePath;
+  $("btnUnduh").textContent = b.filePath ? "Unduh" : "File belum tersedia";
+}
+$("back").onclick = tampilkanList;
+
+
+// ===== Reader PDF: halaman dibalik dengan animasi (geser / tap tepi / tombol) =====
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdf = null, hal = 1, sibuk = false, simpanT = null; const cache = new Map();
+const muatPdfJs = () => new Promise((ok, gagal) => {
+  if (window.pdfjsLib) return ok();
+  const s = document.createElement("script"); s.src = PDFJS + "pdf.min.js";
+  s.onload = async () => {
+    try { const w = await (await fetch(PDFJS + "pdf.worker.min.js")).text(); pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([w], { type: "text/javascript" })); }
+    catch { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; }
+    ok();
+  };
+  s.onerror = () => gagal(new Error("Gagal memuat pembaca PDF. Cek koneksi internet.")); document.head.appendChild(s);
+});
+const tunggu = (el) => new Promise(r => { el.addEventListener("transitionend", r, { once: true }); setTimeout(r, 900); });
+async function renderHal(n) {
+  if (cache.has(n)) return cache.get(n);
+  const p = await pdf.getPage(n), box = $("flip"), v0 = p.getViewport({ scale: 1 });
+  const sc = Math.min((box.clientWidth || innerWidth) / v0.width, (box.clientHeight || innerHeight * .8) / v0.height), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const v = p.getViewport({ scale: sc * dpr }), c = document.createElement("canvas");
+  c.width = v.width; c.height = v.height; c.style.width = v.width / dpr + "px"; c.style.height = v.height / dpr + "px";
+  await p.render({ canvasContext: c.getContext("2d"), viewport: v }).promise;
+  cache.set(n, c); if (cache.size > 8) cache.delete(cache.keys().next().value);
+  return c;
+}
+async function buatLayer(n) {
+  const src = await renderHal(n), c = document.createElement("canvas"); c.width = src.width; c.height = src.height;
+  c.style.width = src.style.width; c.style.height = src.style.height; c.getContext("2d").drawImage(src, 0, 0);
+  const d = document.createElement("div"); d.className = "pg"; d.style.width = src.style.width; d.style.height = src.style.height; d.appendChild(c); return d;
+}
+async function tampil(n, arah) {
+  if (sibuk || !pdf || n < 1 || n > pdf.numPages) return; sibuk = true;
+  try {
+    const box = $("flip"), baru = await buatLayer(n), lama = box.querySelector(".pg");
+    if (!lama || arah === 0) { box.innerHTML = ""; box.appendChild(baru); }
+    else if (arah > 0) { box.insertBefore(baru, lama); lama.style.zIndex = 2; lama.getBoundingClientRect(); lama.classList.add("turun"); await tunggu(lama); lama.remove(); }
+    else { baru.classList.add("awal"); baru.style.zIndex = 3; box.appendChild(baru); baru.getBoundingClientRect(); baru.classList.remove("awal"); await tunggu(baru); baru.style.zIndex = ""; lama.remove(); }
+    hal = n; $("rdHal").textContent = n + " / " + pdf.numPages; $("rdSlider").value = n;
+    clearTimeout(simpanT); simpanT = setTimeout(simpanProgres, 1500);
+    if (n < pdf.numPages) renderHal(n + 1).catch(() => {});
+  } finally { sibuk = false; }
+}
+function simpanProgres() {
+  if (!dipilih || !pdf) return;
+  api("/api/progres", { bukuId: dipilih.b.__id, progres: Math.min(1, Math.max(0, hal / pdf.numPages)) }).catch(() => {});
+}
+$("rdNext").onclick = () => tampil(hal + 1, 1);
+$("rdPrev").onclick = () => tampil(hal - 1, -1);
+$("rdSlider").onchange = (e) => tampil(Number(e.target.value), 0);
+document.addEventListener("keydown", (e) => { if ($("reader").hidden) return; if (e.key === "ArrowRight") tampil(hal + 1, 1); if (e.key === "ArrowLeft") tampil(hal - 1, -1); });
+let x0 = null;
+$("flip").addEventListener("pointerdown", (e) => { x0 = e.clientX; });
+$("flip").addEventListener("pointerup", (e) => {
+  if (x0 === null) return; const dx = e.clientX - x0; x0 = null;
+  if (dx < -40) return tampil(hal + 1, 1); if (dx > 40) return tampil(hal - 1, -1);
+  const r = $("flip").getBoundingClientRect(), rel = (e.clientX - r.left) / r.width;
+  if (rel > 0.65) tampil(hal + 1, 1); else if (rel < 0.35) tampil(hal - 1, -1);
+});
+
+$("btnBacaSini").onclick = async () => {
+  if (!dipilih) return;
+  const { b, k } = dipilih; pdf = null; cache.clear();
+  $("readerTitle").textContent = b.title; $("rdHal").textContent = "";
+  $("flip").innerHTML = '<div class="flip-msg" id="flipMsg">Memuat buku…</div>'; $("reader").hidden = false;
+  if (!b.filePath) { $("flipMsg").innerHTML = b.isiBaca ? String(b.isiBaca).split("\n\n").map(p => `<p>${esc(p)}</p>`).join("") : "Buku ini belum punya file PDF."; return; }
+  try {
+    await muatPdfJs();
+    const r = await api("/api/unduh", { bukuId: b.__id });
+    const resp = await fetch(r.url); if (!resp.ok) throw new Error("File tidak bisa diambil (" + resp.status + "). Cek file di Storage bucket file-buku.");
+    pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await resp.arrayBuffer()) }).promise;
+    $("rdSlider").max = pdf.numPages;
+    const mulai = k.progres > 0.11 ? Math.max(1, Math.min(pdf.numPages, Math.round(k.progres * pdf.numPages))) : 1;
+    $("flip").innerHTML = ""; await tampil(mulai, 0);
+  } catch (e) { $("flipMsg").textContent = "Gagal membuka buku: " + (e.message || e); }
+};
+$("tutupReader").onclick = () => { simpanProgres(); $("reader").hidden = true; pdf = null; cache.clear(); };
+
+$("btnUnduh").onclick = async () => {
+  if (!dipilih || !dipilih.b.filePath) return;
+  $("btnUnduh").disabled = true; $("mbErr").textContent = "";
+  try { const r = await api("/api/unduh", { bukuId: dipilih.b.__id }); window.open(r.url, "_blank", "noopener"); }
+  catch (e) { $("mbErr").textContent = e.message; }
+  $("btnUnduh").disabled = false;
+};
+
+try {
+  const { db, auth } = await siap();
+  onAuthStateChanged(auth, (u) => {
+    if (!u) { location.replace("/login?kembali=/mybook"); return; }
+    onSnapshot(collection(db, "books"), s => { bukuMap = {}; s.forEach(d => bukuMap[d.id] = { ...d.data(), __id: d.id }); if (!$("mbDetail").classList.contains("on")) tampilkanList(); else bukaDetail(dipilih.b.__id); });
+    onSnapshot(query(collection(db, "kepemilikan"), where("uid", "==", u.uid)), s => {
+      const ms = (x) => x?.toMillis ? x.toMillis() : (x?.seconds ? x.seconds * 1000 : Number(new Date(x)) || 0);
+      daftarPunya = s.docs.map(d => d.data()).sort((a, b) => ms(b.dibeli) - ms(a.dibeli));
+      const id = new URLSearchParams(location.search).get("id");
+      if (id && bukuMap[id]) bukaDetail(id); else tampilkanList();
+    }, (er) => { $("status").hidden = false; $("status").textContent = "Tidak bisa memuat My Book: " + (er.code || er.message); });
+  });
+} catch (er) { $("status").textContent = er.message; }
+</script>
+</body></html>
