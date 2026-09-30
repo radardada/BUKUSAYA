@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BUKU SAYA</title><link rel="stylesheet" href="/style.css">
+<style>
+.brand { text-align:center; font-family:var(--serif); font-size:clamp(1.6rem,3vw,2.2rem); font-weight:700; letter-spacing:.04em; margin:0; }
+.home { max-width:1300px; margin:0 auto; padding:20px 20px 0; }
+.greet { font-family:var(--serif); font-size:clamp(1.3rem,3vw,2rem); margin:0 0 4px; }
+.greet-sub { color:var(--muted); margin:0 0 16px; }
+.filters { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+.filters input, .filters select { padding:11px 13px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; }
+.filters select { min-width:170px; }
+.chips { display:flex; gap:8px; overflow-x:auto; padding:12px 0 4px; grid-column:1/-1; }
+.chip { flex:none; padding:7px 15px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+.chip[aria-pressed="true"] { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.info { color:var(--muted); font-size:.88rem; margin:12px 0 0; }
+.grid { max-width:1300px; margin:0 auto; padding:16px 20px 40px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:32px 24px; }
+.book { cursor:pointer; display:flex; flex-direction:column; gap:9px; }
+.book:focus-visible { outline:3px solid var(--accent); outline-offset:4px; border-radius:8px; }
+.cover { aspect-ratio:2/3; border-radius:3px 8px 8px 3px; padding:16px 12px 14px 20px; display:flex; flex-direction:column; justify-content:space-between; color:#fff; position:relative; overflow:hidden; box-shadow:0 6px 14px rgba(20,41,61,.25), inset 4px 0 0 rgba(0,0,0,.22), inset 6px 0 0 rgba(255,255,255,.12); }
+.cover.has-img { padding:0; background:var(--line); } .cover.has-img img { width:100%; height:100%; object-fit:cover; display:block; }
+.cover .ttl { font-family:var(--serif); font-weight:700; font-size:clamp(.95rem,1.5vw,1.35rem); line-height:1.15; }
+.meta h3 { font-size:clamp(.92rem,1.1vw,1.05rem); margin:0; font-family:var(--serif); }
+.meta .by { color:var(--muted); font-size:.85rem; margin:2px 0 0; }
+.meta .row { display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:6px; }
+.price b { font-weight:700; } .no-result { grid-column:1/-1; text-align:center; color:var(--muted); padding:48px 0; }
+@media (max-width:1000px) { .grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:640px)  { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 14px; } }
+</style></head>
+<body>
+<header class="top"><div class="bar"><h1 class="brand">BUKU SAYA</h1></div></header>
+
+<section class="hero"><div class="hero-in">
+  <span class="hero-tag">Toko buku digital</span>
+  <h2>Baca buku favoritmu,<br>langsung di HP.</h2>
+  <p>Bayar pakai saldo, baca online dengan efek halaman dibalik, simpan selamanya di My Book.</p>
+  <div class="hero-pills"><span>&#128214; Baca langsung</span><span>&#127991; Diskon &amp; voucher</span><span>&#9889; Instan</span></div>
+</div></section>
+<section class="home">
+  <h2 class="greet" id="greet"></h2>
+  <p class="greet-sub">Cari buku yang mau kamu baca hari ini.</p>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Cari judul atau penulis" aria-label="Cari buku">
+    <select id="sort" aria-label="Urutkan buku">
+      <option value="default">Urutkan: Terbaru</option>
+      <option value="cheap">Harga termurah</option>
+      <option value="pricey">Harga termahal</option>
+      <option value="rating">Rating tertinggi</option>
+      <option value="laris">Paling laris</option>
+    </select>
+    <div class="chips" id="chips" role="group" aria-label="Kategori"></div>
+  </div>
+  <p class="info" id="info" role="status" aria-live="polite">Memuat katalog…</p>
+</section>
+<main class="grid" id="grid"></main>
+
+<script type="module">
+import { $, esc, rp, siap, onSnapshot, collection, pasangNav } from "/app.js";
+pasangNav("menu");
+
+function greeting() {
+  const h = new Date().getHours();
+  const w = h < 11 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam";
+  return w + ", selamat datang di BUKU SAYA";
+}
+$("greet").textContent = greeting();
+
+let semuaBuku = [], eventMap = {}, cat = "Semua", query = "", sortBy = "default";
+
+function hargaBuku(b) {
+  const ev = b.eventId ? eventMap[b.eventId] : null;
+  if (!ev || ev.status !== "aktif") return { asli: b.price, akhir: b.price, diskon: false };
+  const now = Date.now();
+  if (ev.mulai && now < ev.mulai) return { asli: b.price, akhir: b.price, diskon: false };
+  if (ev.selesai && now > ev.selesai) return { asli: b.price, akhir: b.price, diskon: false };
+  if (Array.isArray(ev.kategori) && ev.kategori.length && !ev.kategori.includes(b.cat)) return { asli: b.price, akhir: b.price, diskon: false };
+  const potongan = ev.tipe === "persen" ? Math.round(b.price * (ev.nilai / 100)) : ev.nilai;
+  return { asli: b.price, akhir: Math.max(0, b.price - Math.min(potongan, b.price)), diskon: true };
+}
+
+function renderChips() {
+  const cats = ["Semua", ...new Set(semuaBuku.map(b => b.cat))];
+  $("chips").innerHTML = cats.map(c => `<button class="chip" type="button" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(el => el.onclick = () => { cat = el.dataset.c; renderChips(); render(); });
+}
+
+function coverHTML(b) {
+  if (b.imgUrl) return `<div class="cover has-img"><img src="${b.imgUrl}" alt="Sampul ${esc(b.title)}" loading="lazy"></div>`;
+  return `<div class="cover" style="background:linear-gradient(160deg, ${b.color}, ${b.color}cc)"><div class="ttl">${esc(b.title)}</div></div>`;
+}
+
+function render() {
+  const q = query.toLowerCase().trim();
+  let list = semuaBuku.filter(b => b.aktif !== false && (cat === "Semua" || b.cat === cat) && (!q || (b.title + " " + b.author).toLowerCase().includes(q)));
+  const h = (b) => hargaBuku(b).akhir;
+  if (sortBy === "cheap") list = [...list].sort((x, y) => h(x) - h(y));
+  else if (sortBy === "pricey") list = [...list].sort((x, y) => h(y) - h(x));
+  else if (sortBy === "rating") list = [...list].sort((x, y) => (y.rating || 0) - (x.rating || 0));
+  else if (sortBy === "laris") list = [...list].sort((x, y) => (y.terjual || 0) - (x.terjual || 0));
+  $("info").textContent = list.length + " buku ditemukan";
+  if (!list.length) { $("grid").innerHTML = `<p class="no-result">Tidak ada buku yang cocok. Coba kata kunci atau kategori lain.</p>`; return; }
+  $("grid").innerHTML = list.map(b => {
+    const h = hargaBuku(b);
+    return `<article class="book" tabindex="0" role="link" data-id="${esc(b.id)}" aria-label="Lihat ${esc(b.title)}">
+      ${coverHTML(b)}
+      <div class="meta">
+        <h3>${esc(b.title)}</h3><p class="by">${esc(b.author)}</p>
+        <div class="row"><span class="price">${h.diskon ? `<span class="strike">${rp(h.asli)}</span> <b>${rp(h.akhir)}</b>` : `<b>${rp(h.akhir)}</b>`}</span><span class="stars">&#9733; ${(b.rating || 0).toFixed(1)}</span></div>
+      </div></article>`;
+  }).join("");
+  $("grid").querySelectorAll(".book").forEach(el => {
+    el.onclick = () => location.href = "/buku?id=" + encodeURIComponent(el.dataset.id);
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } };
+  });
+}
+$("q").oninput = e => { query = e.target.value; render(); };
+$("sort").onchange = e => { sortBy = e.target.value; render(); };
+
+try {
+  const { db } = await siap();
+  onSnapshot(collection(db, "events"), s => { eventMap = {}; s.forEach(d => eventMap[d.id] = d.data()); render(); });
+  onSnapshot(collection(db, "books"), s => {
+    semuaBuku = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!semuaBuku.length) { $("info").textContent = "Katalog masih kosong. Admin bisa menambah buku di /admin."; }
+    renderChips(); render();
+  }, () => { $("info").textContent = "Tidak bisa memuat katalog. Periksa koneksi atau firestore.rules."; });
+} catch (er) { $("info").textContent = er.message; }
+</script>
+</body></html>
